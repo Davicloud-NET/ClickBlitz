@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Package manifest of the Microsoft Store version (MSIX). build-msix.cmd packs it together with the
+  x64 Release build and the logos in Assets.
+
+  Three values in here still are PLACEHOLDERs, because Partner Center hands them out when the app name is
+  reserved. Afterwards they are listed at https://partner.microsoft.com/dashboard under the app, on the
+  page "Product management" > "Product identity":
+
+    Package/Identity/Name                    goes into Identity Name
+    Package/Identity/Publisher               goes into Identity Publisher
+    Package/Properties/PublisherDisplayName  goes into PublisherDisplayName
+
+  The Store only accepts a package in which all three are exactly what that page says.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <!-- Version is filled in by build-msix.cmd, which takes it from APP_VERSION_NUMBER in ClickBlitz.h -->
+  <Identity
+    Name="PLACEHOLDER.ClickBlitz"
+    Publisher="CN=PLACEHOLDER"
+    Version="0.0.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <!-- Has to be the name that was reserved in Partner Center -->
+    <DisplayName>ClickBlitz</DisplayName>
+    <PublisherDisplayName>PLACEHOLDER</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Dependencies>
+    <!-- Windows 10 1809 is the oldest version the package installs on. Older ones get the portable executable. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <!-- An ordinary desktop program rather than a sandboxed app. Sending clicks to other windows needs that. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="ClickBlitz" Executable="ClickBlitz.exe" EntryPoint="Windows.FullTrustApplication">
+      <!-- The logos exist per scale factor and size only (Square44x44Logo.scale-200.png and so on).
+           resources.pri, which build-msix.cmd generates, maps these names onto them. -->
+      <uap:VisualElements
+        DisplayName="ClickBlitz"
+        Description="Small and accurate auto-clicker"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+    </Application>
+  </Applications>
+</Package>

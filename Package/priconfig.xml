@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tells makepri.exe how to build resources.pri, the index through which Windows finds the logo that fits
+  the scale factor, size and theme it needs (see build-msix.cmd).
+
+  This is what "makepri createconfig" writes, less its <packaging> element. That element moves the logos
+  of every scale factor into a resource package of their own, which only an app bundle can hold. Here
+  everything is to end up in the one resources.pri of the one package.
+-->
+<resources targetOsVersion="10.0.0" majorVersion="1">
+  <index root="\" startIndexAt="\">
+    <default>
+      <qualifier name="Language" value="en-US"/>
+      <qualifier name="Contrast" value="standard"/>
+      <qualifier name="Scale" value="100"/>
+      <qualifier name="HomeRegion" value="001"/>
+      <qualifier name="TargetSize" value="256"/>
+      <qualifier name="LayoutDirection" value="LTR"/>
+      <qualifier name="Theme" value="dark"/>
+      <qualifier name="AlternateForm" value=""/>
+      <qualifier name="DXFeatureLevel" value="DX9"/>
+      <qualifier name="Configuration" value=""/>
+      <qualifier name="DeviceFamily" value="Universal"/>
+      <qualifier name="Custom" value=""/>
+    </default>
+    <!-- Reads the qualifiers out of file names such as Square44x44Logo.scale-200.png -->
+    <indexer-config type="folder" foldernameAsQualifier="true" filenameAsQualifier="true" qualifierDelimiter="."/>
+  </index>
+</resources>

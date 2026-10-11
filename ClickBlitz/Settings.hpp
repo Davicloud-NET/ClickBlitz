@@ -20,7 +20,8 @@ enum class HotkeyMode
 	Hold    // Clicks for as long as the hotkey is held down
 };
 
-// Everything the user can set up in the window. Kept in ClickBlitz.ini next to the executable.
+// Everything the user can set up in the window. Kept in ClickBlitz.ini next to the executable, or in
+// %LOCALAPPDATA%\ClickBlitz when installed from the Microsoft Store.
 struct Settings
 {
 	static constexpr int MaxClicksPerSecond = 10000;

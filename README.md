@@ -9,7 +9,7 @@ It can easily reach the speeds specified by the user, unlike many other autoclic
 - Clicks the left, middle or right mouse button, or presses a keyboard key
 - Can stop by itself after a number of clicks
 - Hotkey (a key or a side mouse button) that toggles clicking, or clicks for as long as it is held down
-- Remembers its settings in a `ClickBlitz.ini` next to the executable
+- Remembers its settings in a `ClickBlitz.ini` next to the executable (in `%LOCALAPPDATA%\ClickBlitz` when installed from the Microsoft Store)
 - Does not react to its own clicks, so it cannot press its own buttons or minimize itself
 
 ## Software requirements
@@ -41,3 +41,13 @@ Open `ClickBlitz.sln` with Visual Studio 2022 or later.
 
 - `Debug` and `Release` are built with the toolset of the Visual Studio you are using. The result runs on the Windows versions that toolset supports (Windows 10 and later for Visual Studio 2026).
 - `ReleaseXP` is the build that runs on everything from Windows XP (SP3) to Windows 11. It needs the `v141_xp` toolset. Visual Studio 2026 no longer offers it, but Visual Studio 2022 and the Build Tools for Visual Studio 2022 do, as the components *MSVC v141 - VS 2017 C++ x64/x86 build tools* and *C++ Windows XP Support for VS 2017 (v141) tools*. With those installed, `build-xp.cmd` builds this configuration from the command line.
+
+## Microsoft Store package
+`build-msix.cmd` builds `Release` for x64 and packs it into `bin\ClickBlitz_<version>_x64.msix`, the file that is uploaded to the Microsoft Store in [Partner Center](https://partner.microsoft.com/dashboard). Besides Visual Studio it needs the Windows 10 or 11 SDK, for `makepri.exe` and `makeappx.exe`. The package installs on Windows 10 1809 and later; the `ReleaseXP` executable stays the download for everything older.
+
+- `Package\AppxManifest.xml` describes the package. Its `Identity Name`, `Identity Publisher` and `PublisherDisplayName` are placeholders. The real values exist once the app name is reserved in Partner Center, which lists them under *Product management* > *Product identity*, and the Store only accepts a package that has exactly those.
+- The version of the package is `APP_VERSION_NUMBER` from `ClickBlitz.h`. The Store wants its fourth number to be 0, and a higher version with every update.
+- The logos in `Package\Assets` were made from `ClickBlitz.ico` by `Package\make-assets.cmd`, which needs [ImageMagick](https://imagemagick.org). It only has to run again after the icon has changed.
+- The package is not signed, because the Store signs it. Windows does not install it like that. To try the packaged app first, turn on Developer Mode in the Windows settings and register the folder the package was made from: `Add-AppxPackage -Register obj\Msix\Package\AppxManifest.xml` in PowerShell.
+
+Installed from a package, ClickBlitz keeps its settings in `%LOCALAPPDATA%\ClickBlitz\ClickBlitz.ini`, because the folder it is installed in is read-only.
