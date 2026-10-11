@@ -1,97 +1,115 @@
 #include "AutoClicker.hpp"
-#include "Utils.hpp"
-#include "ClickBlitz.h"
-#include <WinUser.h>
-#include <thread>
+#include "ClickLoop.hpp"
 
-std::atomic<bool> AutoClicker::AutoClickerActive;
-
-void AutoClicker::AutoClickThread(int Speed, bool CPS, int StopAt, MouseButton SelectedMouseButton) // Speed is either the intervall in ms or the clicks per second, depending on the CPS bool
+namespace
 {
-	long long SleepTime_ms;
-	if (CPS == true)
-		SleepTime_ms = (1.0 / Speed) * 1000;
-	else
-		SleepTime_ms = Speed;
-
-	unsigned char SelectedInput = 0;
-	unsigned char SelectedInputUp = 0;
-	switch (SelectedMouseButton)
+	// Keys the keyboard reports with the 0xE0 scan code prefix. Without the flag some of them
+	// would arrive as their numpad twin (e.g. Insert as Numpad 0).
+	bool IsExtendedKey(WORD virtualKey)
 	{
-		case Left:
-			SelectedInput = MOUSEEVENTF_LEFTDOWN;
-			SelectedInputUp = MOUSEEVENTF_LEFTUP;
-			break;
-		case Right:
-			SelectedInput = MOUSEEVENTF_RIGHTDOWN;
-			SelectedInputUp = MOUSEEVENTF_RIGHTUP;
-			break;
-		case Middle:
-			SelectedInput = MOUSEEVENTF_MIDDLEDOWN;
-			SelectedInputUp = MOUSEEVENTF_MIDDLEUP;
-			break;
-	}
-
-	INPUT Inputs[2];
-	ZeroMemory(&Inputs, sizeof(INPUT));
-	Inputs[0].type = INPUT_MOUSE;
-	Inputs[0].mi.dwFlags = SelectedInput;
-	Inputs[0].mi.time = 0;
-	Inputs[1].type = INPUT_MOUSE;
-	Inputs[1].mi.dwFlags = SelectedInputUp;
-	Inputs[1].mi.time = 0;
-
-	if (StopAt > 0) 
-	{
-		int i = 0;
-		while (AutoClickerActive.load() == true && i < StopAt)
+		switch (virtualKey)
 		{
-			i++;
-			SendInput(2, Inputs, sizeof(INPUT));
-			Utils::Sleep(SleepTime_ms);
+		case VK_INSERT: case VK_DELETE: case VK_HOME: case VK_END: case VK_PRIOR: case VK_NEXT:
+		case VK_LEFT: case VK_UP: case VK_RIGHT: case VK_DOWN:
+		case VK_DIVIDE: case VK_NUMLOCK: case VK_SNAPSHOT:
+		case VK_RCONTROL: case VK_RMENU: case VK_LWIN: case VK_RWIN: case VK_APPS:
+			return true;
 		}
+		return virtualKey >= VK_BROWSER_BACK && virtualKey <= VK_LAUNCH_APP2;
 	}
-	else
+}
+
+Click Click::OfMouseButton(MouseButton button)
+{
+	Click click = {};
+	click.press.type = INPUT_MOUSE;
+	click.press.mi.dwExtraInfo = Signature;
+	click.release.type = INPUT_MOUSE;
+	click.release.mi.dwExtraInfo = Signature;
+	switch (button)
 	{
-		while (AutoClickerActive.load() == true)
-		{
-			SendInput(2, Inputs, sizeof(INPUT));
-			Utils::Sleep(SleepTime_ms);
-		}
+	case MouseButton::Left:
+		click.press.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+		click.release.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+		break;
+	case MouseButton::Middle:
+		click.press.mi.dwFlags = MOUSEEVENTF_MIDDLEDOWN;
+		click.release.mi.dwFlags = MOUSEEVENTF_MIDDLEUP;
+		break;
+	case MouseButton::Right:
+		click.press.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+		click.release.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+		break;
 	}
-
-	AutoClickerActive.store(bool(false));
+	return click;
 }
 
-void AutoClicker::AutoClick_Intervall(int intervall_ms, int StopAt, MouseButton SelectedMouseButton)
+Click Click::OfKey(WORD virtualKey)
 {
-	if (AutoClickerActive.load() == true)
-		return;
-
-	EnableGUIInputs(false);
-
-	AutoClickerActive.store(bool(true));
-	std::thread autoClickThread(&AutoClickThread, intervall_ms, false, StopAt, SelectedMouseButton);
-	autoClickThread.detach();
+	Click click = {};
+	click.press.type = INPUT_KEYBOARD;
+	click.press.ki.wVk = virtualKey;
+	// Games tend to read scan codes rather than virtual keys
+	click.press.ki.wScan = static_cast<WORD>(MapVirtualKeyW(virtualKey, MAPVK_VK_TO_VSC));
+	click.press.ki.dwFlags = IsExtendedKey(virtualKey) ? KEYEVENTF_EXTENDEDKEY : 0;
+	click.press.ki.dwExtraInfo = Signature;
+	click.release = click.press;
+	click.release.ki.dwFlags |= KEYEVENTF_KEYUP;
+	return click;
 }
 
-void AutoClicker::AutoClick_Rate(int ClicksPerSecond, int StopAt, MouseButton SelectedMouseButton)
+AutoClicker::AutoClicker()
+	: m_stopEvent(CreateEventW(nullptr, TRUE, FALSE, nullptr))
 {
-	if (AutoClickerActive.load() == true)
-		return;
-
-	EnableGUIInputs(false);
-
-	AutoClickerActive.store(bool(true));
-	std::thread autoClickThread(&AutoClickThread, ClicksPerSecond, true, StopAt, SelectedMouseButton);
-	autoClickThread.detach();
 }
 
-void AutoClicker::AutoClick_Stop()
+AutoClicker::~AutoClicker()
 {
-	if (AutoClickerActive.load() == false) // If the AutoClicker is not active, return
-		return;
-	AutoClickerActive.store(bool(false));
+	Stop();
+	CloseHandle(m_stopEvent);
+}
 
-	EnableGUIInputs(true);
+unsigned int AutoClicker::Start(const Click& click, double periodSeconds, uint64_t clickLimit, HWND notifyWindow, UINT finishedMessage)
+{
+	Stop(); // Also collects the thread of a run that ended on its own
+
+	m_stopRequested.store(false);
+	ResetEvent(m_stopEvent);
+	m_running.store(true);
+	m_runId++;
+	m_thread = std::thread(&AutoClicker::Run, this, click, periodSeconds, clickLimit, notifyWindow, finishedMessage, m_runId);
+	return m_runId;
+}
+
+void AutoClicker::Stop()
+{
+	if (!m_thread.joinable())
+		return;
+
+	m_stopRequested.store(true);
+	SetEvent(m_stopEvent);
+	m_thread.join();
+}
+
+void AutoClicker::Run(Click click, double periodSeconds, uint64_t clickLimit, HWND notifyWindow, UINT finishedMessage, unsigned int runId)
+{
+	// Waking up on time matters more than fairness here, and the thread sleeps for most of its life.
+	// With only one core, however, a time critical thread that ends up spinning (very short
+	// intervals do that) would starve the window, so the priority is left alone there.
+	SYSTEM_INFO systemInfo;
+	GetSystemInfo(&systemInfo);
+	if (systemInfo.dwNumberOfProcessors > 1)
+		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
+	PrecisionWait wait;
+	INPUT inputs[2] = { click.press, click.release };
+	RunClickLoop(wait, periodSeconds * static_cast<double>(wait.TicksPerSecond()), clickLimit, m_stopEvent, m_stopRequested,
+		[&inputs](int64_t)
+		{
+			SendInput(2, inputs, sizeof(INPUT));
+		});
+
+	m_running.store(false);
+	if (!m_stopRequested.load())
+		PostMessageW(notifyWindow, finishedMessage, runId, 0);
 }

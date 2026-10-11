@@ -1,17 +1,8 @@
 #pragma once
 
-#pragma comment(linker,"\"/manifestdependency:type                  = 'win32' \
-                                              name                  = 'Microsoft.Windows.Common-Controls' \
-                                              version               = '6.0.0.0' \
-                                              processorArchitecture = '*' \
-                                              publicKeyToken        = '6595b64144ccf1df' \
-                                              language              = '*'\"")
-
-#include "resource.h"
-
-// Public string constants
+// Public string constants. ClickBlitz.rc2 includes this file as well, so only preprocessor definitions belong here.
 #define APP_NAME L"ClickBlitz"
 #define APP_VERSION L"1.1.0"
+#define APP_VERSION_NUMBER 1,1,0,0
 #define APP_AUTHOR L"David Jonjic"
-
-void EnableGUIInputs(bool isEnabled);
+#define APP_COPYRIGHT L"Copyright (c) 2024 David Jonjic"
